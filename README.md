@@ -161,7 +161,7 @@ This project is licensed under the **MIT License**.
 - Assisted by Co-Pilot (ChatGPT)
 - **[MyAnimeList API](https://myanimelist.net/apiconfig/references/api/v2)**
 - **[Notion API](https://developers.notion.com/reference/intro)**
-- Built with ❤️ by [Your Name](https://github.com/lozo6)
+- Built with ❤️ by [lozo6](https://github.com/lozo6)
 
 ---
 
