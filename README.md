@@ -16,7 +16,7 @@
 ##  Getting Started
 
 ### **System Requirements**
-- Node.js **18.x** or later is required.
+- Node.js **18.x** or later is recommended.
 - Ensure you have `npm` installed.
 
 
