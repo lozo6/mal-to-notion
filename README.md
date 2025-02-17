@@ -15,6 +15,11 @@
 
 ##  Getting Started
 
+### **System Requirements**
+- Node.js **18.x** or later is required.
+- Ensure you have `npm` installed.
+
+
 ### **1️⃣ Clone the Repository**
 ```sh
 git clone https://github.com/lozo6/mal-to-notion.git
@@ -154,7 +159,7 @@ This project is licensed under the **MIT License**.
 - Assisted by Co-Pilot (ChatGPT)
 - **[MyAnimeList API](https://myanimelist.net/apiconfig/references/api/v2)**
 - **[Notion API](https://developers.notion.com/reference/intro)**
-- Built with ❤️ by [lozo6](https://github.com/lozo6)
+- Built with ❤️ by [Your Name](https://github.com/lozo6)
 
 ---
 
