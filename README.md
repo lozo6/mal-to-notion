@@ -4,21 +4,20 @@
 
 ---
 
-##  Features
--  Fetches **your anime list** from **MyAnimeList API**
--  Automatically **refreshes tokens** when needed
--  Pushes anime data to a **Notion database**
--  Supports **Notion page creation & status updates**
--  Built with **TypeScript & Node.js**
+## Features
+- Fetches **your anime list** from **MyAnimeList API**
+- Automatically **refreshes tokens** when needed
+- Pushes anime data to a **Notion database**
+- Supports **Notion page creation & status updates**
+- Built with **TypeScript & Node.js**
 
 ---
 
-##  Getting Started
+## Getting Started
 
 ### **System Requirements**
 - Node.js **18.x** or later is recommended.
 - Ensure you have `npm` installed.
-
 
 ### **1️⃣ Clone the Repository**
 ```sh
@@ -41,19 +40,24 @@ NOTION_API_KEY=your_notion_api_key
 DATABASE_ID=your_notion_database_id
 ```
 
-### **4️⃣ Fetch Your MAL Anime List**
+### **4️⃣ Compile TypeScript Code**
 ```sh
-npx ts-node src/fetchMal.ts
+npx tsc
 ```
 
-### **5️⃣ Push Data to Notion**
+### **5️⃣ Fetch Your MAL Anime List**
 ```sh
-npx ts-node src/syncNotion.ts
+node dist/fetchMal.js
+```
+
+### **6️⃣ Push Data to Notion**
+```sh
+node dist/syncNotion.js
 ```
 
 ---
 
-##  Generating MyAnimeList `ACCESS_TOKEN` and `REFRESH_TOKEN`
+## Generating MyAnimeList `ACCESS_TOKEN` and `REFRESH_TOKEN`
 For official documentation, refer to the **[MyAnimeList OAuth Guide](https://myanimelist.net/apiconfig/references/api/v2#section/Authorization/OAuth2)**.
 
 The **MyAnimeList API** uses **OAuth 2.0 with PKCE** for authentication. Follow these steps to get your tokens.
@@ -140,7 +144,7 @@ console.log(response.data);
 
 ---
 
-##  Contributing
+## Contributing
 We welcome contributions from the community! If you'd like to improve **mal-to-notion**, please:
 1. **Fork the repository**
 2. **Create a feature branch** (`git checkout -b feature-name`)
@@ -152,22 +156,19 @@ We welcome contributions from the community! If you'd like to improve **mal-to-n
 
 ---
 
-##  License
+## License
 This project is licensed under the **MIT License**.
 
 ---
 
-##  Acknowledgments
-- Assisted by Co-Pilot (ChatGPT)
+## Acknowledgments
 - **[MyAnimeList API](https://myanimelist.net/apiconfig/references/api/v2)**
 - **[Notion API](https://developers.notion.com/reference/intro)**
-- Built with ❤️ by [lozo6](https://github.com/lozo6)
+- Built by [lozo6](https://github.com/lozo6)
 
 ---
 
-##  Contact
+## Contact
 For support, questions, or feature requests:
 - Open an issue [here](https://github.com/lozo6/mal-to-notion/issues)
 - Reach out via GitHub Discussions
-
-Happy coding! 🔥
