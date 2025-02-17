@@ -18,9 +18,9 @@
   },
   "homepage": "https://github.com/lozo6/mal-to-notion#readme",
   "dependencies": {
+    "@notionhq/client": "^2.2.15",
     "axios": "^1.7.9",
-    "dotenv": "^16.4.7",
-    "notion-client": "^7.1.6"
+    "dotenv": "^16.4.7"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
