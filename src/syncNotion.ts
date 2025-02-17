@@ -131,7 +131,10 @@ async function addAnimeEntry(anime: Anime) {
 
 async function main() {
     const jsonData = await loadJsonData();
-    await Promise.all(jsonData.map(anime => addAnimeEntry(anime)));
+    for (const anime of jsonData) {
+        await addAnimeEntry(anime);
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
 }
 
 main();
