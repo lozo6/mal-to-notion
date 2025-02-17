@@ -1,0 +1,30 @@
+{
+  "name": "mal-to-notion",
+  "version": "1.0.0",
+  "description": "MyAnimeList Notion Automation",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lozo6/mal-to-notion.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/lozo6/mal-to-notion/issues"
+  },
+  "homepage": "https://github.com/lozo6/mal-to-notion#readme",
+  "dependencies": {
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "notion-client": "^7.1.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  }
+}
