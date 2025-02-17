@@ -54,6 +54,8 @@ npx ts-node src/syncNotion.ts
 ---
 
 ##  Generating MyAnimeList `ACCESS_TOKEN` and `REFRESH_TOKEN`
+For official documentation, refer to the **[MyAnimeList OAuth Guide](https://myanimelist.net/apiconfig/references/api/v2#section/Authorization/OAuth2)"**.
+
 The **MyAnimeList API** uses **OAuth 2.0 with PKCE** for authentication. Follow these steps to get your tokens.
 
 ### **1️⃣ Get Your `CLIENT_ID`**
