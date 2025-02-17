@@ -31,10 +31,11 @@ interface Anime {
         alternative_titles: {
             en?: string;
         };
+        synopsis: string;
+        genres?: { id: number; name: string }[];
         my_list_status: {
             status: string;
         };
-        synopsis: string;
     };
 }
 
@@ -52,14 +53,16 @@ async function loadJsonData(): Promise<Anime[]> {
     }
 }
 
-async function entryExists(id: number): Promise<boolean> {
+async function entryExists(id: number, title: string): Promise<boolean> {
     try {
+        const animeURL = `https://myanimelist.net/anime/${id}/${title}`;
+
         const response = await notion.databases.query({
             database_id: databaseId,
             filter: {
                 property: "URL",
                 url: {
-                    contains: `https://myanimelist.net/anime/${id}`,
+                    contains: animeURL,
                 },
             },
         });
@@ -72,14 +75,18 @@ async function entryExists(id: number): Promise<boolean> {
 
 async function addAnimeEntry(anime: Anime) {
     try {
-        const { id, title, main_picture, alternative_titles, my_list_status, synopsis } = anime.node;
+        const { id, title, main_picture, alternative_titles, synopsis, genres, my_list_status } = anime.node;
         const sanitizedTitle = sanitizeTitle(title);
         const animeUrl = `https://myanimelist.net/anime/${id}/${sanitizedTitle}`;
 
-        if (await entryExists(id)) {
+        if (await entryExists(id, sanitizedTitle)) {
             console.log(`Skipping duplicate: ${title}`);
             return;
         }
+
+        const notionGenres = genres
+            ? genres.map((genre) => ({ name: genre.name }))
+            : [];
 
         const notionPage = await notion.pages.create({
             parent: { database_id: databaseId },
@@ -92,6 +99,7 @@ async function addAnimeEntry(anime: Anime) {
                 Status: {
                     status: { name: statusMapping[my_list_status.status] || "Plan to Watch" },
                 },
+                Genre: { multi_select: notionGenres },
             },
             cover: main_picture.large ? {
                 type: "external",
@@ -129,18 +137,18 @@ async function addAnimeEntry(anime: Anime) {
     }
 }
 
-async function main() {
-    const jsonData = await loadJsonData();
-    await Promise.all(jsonData.map(anime => addAnimeEntry(anime)));
-}
-
-// FOR LOOP FUNCTION FOR BACKUP
 // async function main() {
 //     const jsonData = await loadJsonData();
-//     for (const anime of jsonData) {
-//         await addAnimeEntry(anime);
-//         await new Promise(resolve => setTimeout(resolve, 500));
-//     }
+//     await Promise.all(jsonData.map(anime => addAnimeEntry(anime)));
 // }
+
+// FOR LOOP FUNCTION FOR BACKUP
+async function main() {
+    const jsonData = await loadJsonData();
+    for (const anime of jsonData) {
+        await addAnimeEntry(anime);
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+}
 
 main();

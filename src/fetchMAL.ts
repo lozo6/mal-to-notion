@@ -37,6 +37,7 @@ interface AnimeNode {
             ja?: string;
         };
         synopsis: string;
+        genres?: { id: number; name: string }[];
         my_list_status?: {
             status: string;
             score: number;
@@ -114,7 +115,7 @@ async function refreshAccessToken(): Promise<void> {
 
 async function fetchAllAnime(access_token: string): Promise<AnimeNode[]> {
     const allAnime: AnimeNode[] = [];
-    let nextUrl: string | null = MAL_API_LIST + "?nsfw=true&fields=id,title,main_picture,alternative_titles,synopsis,my_list_status";
+    let nextUrl: string | null = MAL_API_LIST + "?nsfw=true&fields=id,title,main_picture,alternative_titles,synopsis,genres,my_list_status";
 
     while (nextUrl) {
         const response: AxiosResponse<MyAnimeListResponse> = await axios.get(nextUrl, {
