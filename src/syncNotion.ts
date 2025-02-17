@@ -44,7 +44,7 @@ function sanitizeTitle(title: string): string {
 
 async function loadJsonData(): Promise<Anime[]> {
     try {
-        const data = await fs.readFile("data/test.json", "utf-8");
+        const data = await fs.readFile("data/MyAnimeList.json", "utf-8");
         return JSON.parse(data);
     } catch (error) {
         console.error("Error reading or parsing JSON file:", error);
