@@ -80,7 +80,7 @@ async function addAnimeEntry(anime: Anime) {
         const animeUrl = `https://myanimelist.net/anime/${id}/${sanitizedTitle}`;
 
         if (await entryExists(id, sanitizedTitle)) {
-            console.log(`Skipping duplicate: ${title}`);
+            // console.log(`Skipping duplicate: ${title}`);
             return;
         }
 
@@ -137,18 +137,18 @@ async function addAnimeEntry(anime: Anime) {
     }
 }
 
-// async function main() {
-//     const jsonData = await loadJsonData();
-//     await Promise.all(jsonData.map(anime => addAnimeEntry(anime)));
-// }
-
-// FOR LOOP FUNCTION FOR BACKUP
 async function main() {
     const jsonData = await loadJsonData();
-    for (const anime of jsonData) {
-        await addAnimeEntry(anime);
-        await new Promise(resolve => setTimeout(resolve, 500));
-    }
+    await Promise.all(jsonData.map(anime => addAnimeEntry(anime)));
 }
+
+// FOR LOOP FUNCTION FOR BACKUP
+// async function main() {
+//     const jsonData = await loadJsonData();
+//     for (const anime of jsonData) {
+//         await addAnimeEntry(anime);
+//         await new Promise(resolve => setTimeout(resolve, 500));
+//     }
+// }
 
 main();
