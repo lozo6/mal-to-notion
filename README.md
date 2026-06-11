@@ -1,174 +1,334 @@
-# MAL to Notion
+# Notion to MyAnimeList Webhook
 
-**mal-to-notion** is a TypeScript-powered CLI tool that fetches **MyAnimeList (MAL) data** and syncs it to **Notion**. It enables anime tracking in Notion by pulling MAL anime lists and adding them to a Notion database.
+notion-to-mal-webhook is a TypeScript-powered serverless webhook that syncs your anime list from Notion to MyAnimeList (MAL) in real-time. Change a status or episode count in Notion, and it automatically updates on MAL.
 
 ---
 
 ## Features
-- Fetches **your anime list** from **MyAnimeList API**
-- Automatically **refreshes tokens** when needed
-- Pushes anime data to a **Notion database**
-- Supports **Notion page creation & status updates**
-- Built with **TypeScript & Node.js**
+
+- Real-time sync — Changes in Notion instantly update MAL
+- Status updates — Plan to Watch, Watching, Completed, On Hold, Dropped
+- Episode tracking — Sync episodes watched to MAL
+- Error handling — Detailed error messages stored in Notion
+- Token refresh — Automatic MAL OAuth token refresh
+- Search fallback — If MAL URL is missing, searches by anime title
+- TypeScript — Fully typed for safety
+- Vercel deployment — One-click serverless deployment
+- Local testing — Test your webhook before deploying
 
 ---
 
-## Getting Started
+## Project Structure
 
-### **System Requirements**
-- Node.js **18.x** or later is recommended.
-- Ensure you have `npm` installed.
-
-### **1️⃣ Clone the Repository**
-```sh
-git clone https://github.com/lozo6/mal-to-notion.git
-cd mal-to-notion
+```
+notion-to-mal-webhook/
+├── api/
+│   ├── sync-mal.ts                 # Vercel serverless webhook function (Notion → MAL)
+│   └── sync-from-mal.ts            # Vercel webhook for MAL → Notion sync
+├── scripts/
+│   ├── oauth-setup.ts              # One-time OAuth setup
+│   └── test-webhook.ts             # Local webhook testing
+├── src/
+│   ├── types.ts                    # TypeScript types & interfaces
+│   ├── mal-api.ts                  # MAL API functions
+│   └── notion-api.ts               # Notion API utilities
+├── .env.example                    # Example environment variables
+├── .env                            # Your secrets (local only, gitignored)
+├── .gitignore                      # Git ignore rules
+├── package.json                    # Dependencies & scripts
+├── tsconfig.json                   # TypeScript configuration
+└── README.md                        # This file
 ```
 
-### **2️⃣ Install Dependencies**
-```sh
+---
+
+## Prerequisites
+
+- Node.js 18+ (verify with `node --version`)
+- npm (comes with Node)
+- MyAnimeList Account — You'll need to register an API application
+- Notion Account — With access to your anime database
+- Vercel Account (optional, for deployment) — Free tier works fine
+
+---
+
+## Setup Instructions
+
+### Step 1: Clone & Install
+
+```bash
+git clone https://github.com/lozo6/notion-to-mal-webhook.git
+cd notion-to-mal-webhook
 npm install
 ```
 
-### **3️⃣ Set Up Environment Variables**
-Create a `.env` file inside the project root:
+### Step 2: Environment Variables
+
+Copy .env.example to .env:
+
+```bash
+cp .env.example .env
+```
+
+Fill in your credentials:
+
 ```ini
-MAL_CLIENT_ID=your_mal_client_id
-ACCESS_TOKEN=your_mal_access_token
-REFRESH_TOKEN=your_mal_refresh_token
-NOTION_API_KEY=your_notion_api_key
-DATABASE_ID=your_notion_database_id
+MAL_CLIENT_ID=your_client_id_here
+MAL_CLIENT_SECRET=your_client_secret_here
+MAL_REFRESH_TOKEN=will_be_set_after_oauth_setup
+
+NOTION_API_KEY=your_notion_api_key_here
+NOTION_DATABASE_ID=your_anime_database_id_here
+
+WEBHOOK_SECRET=your_random_secret_here
+
+LOCAL_PORT=3000
+NODE_ENV=development
 ```
 
-### **4️⃣ Compile TypeScript Code**
-```sh
-npx tsc
+### Step 3: Get MAL Client ID
+
+1. Go to MyAnimeList API Applications (https://myanimelist.net/apiconfig)
+2. Click Create ID and fill in the form:
+   - App Name: "Notion to MAL Webhook"
+   - App Type: "Web"
+   - Redirect URL: http://localhost/oauth
+   - Homepage URL: Your GitHub repo or personal website
+3. Copy your Client ID (and optionally Client Secret) to .env
+
+### Step 4: Get Notion API Key & Database ID
+
+1. Go to Notion Developer Console (https://www.notion.so/profile/integrations)
+2. Click Create New Integration and follow the prompts
+3. Copy your API Key to .env as NOTION_API_KEY
+4. Open your anime database in Notion, copy the database ID from the URL:
+   - URL: https://www.notion.so/{workspace}/{DATABASE_ID}?v=...
+   - Copy everything between the slash and the question mark
+
+### Step 5: Run OAuth Setup (One-time)
+
+This generates your MAL access & refresh tokens:
+
+```bash
+npm run oauth
 ```
 
-### **5️⃣ Fetch Your MAL Anime List**
-```sh
-node dist/fetchMal.js
+Follow the prompts:
+
+1. Click the generated authorization URL
+2. Authorize the application on MyAnimeList
+3. Copy the authorization code from the redirect URL
+4. Paste it back into the terminal
+
+Your .env file will be automatically updated with the refresh token.
+
+### Step 6: Test Locally
+
+Before deploying, test the webhook locally:
+
+```bash
+npm run test
 ```
 
-### **6️⃣ Push Data to Notion**
-```sh
-node dist/syncNotion.js
-```
+This runs three test scenarios:
+
+1. Basic Status Update
+2. Status + Episodes
+3. Mark Completed
 
 ---
 
-## Generating MyAnimeList `ACCESS_TOKEN` and `REFRESH_TOKEN`
-For official documentation, refer to the **[MyAnimeList OAuth Guide](https://myanimelist.net/apiconfig/references/api/v2#section/Authorization/OAuth2)**.
+## Notion Database Setup
 
-The **MyAnimeList API** uses **OAuth 2.0 with PKCE** for authentication. Follow these steps to get your tokens.
+Your anime database needs these properties:
 
-### **1️⃣ Get Your `CLIENT_ID`**
-1. Go to **[MyAnimeList API Applications](https://myanimelist.net/apiconfig)**
-2. Create a new application if you haven't already.
-3. Copy your **Client ID** from the application settings.
+Name (Title) - Required - Anime title
+URL (URL) - Optional - MAL anime link
+Status (Status) - Required - Plan to Watch / Watching / Completed / On Hold / Dropped
+Episodes Watched (Number) - Optional
+Episodes Total (Number) - Optional
+Genre (Multi-select) - Optional
+Sync Status (Select) - Internal
+Last Synced (Date) - Internal
+Sync Error Message (Rich Text) - Internal
 
-### **2️⃣ Generate Authorization URL**
-Replace `YOUR_CLIENT_ID` with your actual client ID:
-```sh
-https://myanimelist.net/v1/oauth2/authorize?response_type=code&client_id=YOUR_CLIENT_ID&state=YOUR_RANDOM_STRING&code_challenge=YOUR_RANDOM_CHALLENGE
-```
+Status options:
 
-### **3️⃣ Open the Authorization URL**
-1. Copy the generated URL and **paste it into your browser**.
-2. Click **Authorize**.
-3. You will be redirected to `localhost:8000/callback?code=YOUR_AUTH_CODE&state=YOUR_STATE`.
-4. Copy the **`code`** from the URL.
+- Plan to Watch
+- Watching
+- Completed
+- On Hold
+- Dropped
 
-### **4️⃣ Exchange the Authorization Code for an `ACCESS_TOKEN`**
-Run the following cURL command:
-```sh
-curl -X POST https://myanimelist.net/v1/oauth2/token \
-     -d "client_id=YOUR_CLIENT_ID" \
-     -d "grant_type=authorization_code" \
-     -d "code=YOUR_AUTH_CODE" \
-     -d "code_verifier=YOUR_RANDOM_CHALLENGE"
-```
+Sync Status options:
 
-Or using **TypeScript (Axios)**:
-```typescript
-import axios from "axios";
-
-const params = new URLSearchParams();
-params.append("client_id", "YOUR_CLIENT_ID");
-params.append("grant_type", "authorization_code");
-params.append("code", "YOUR_AUTH_CODE");
-params.append("code_verifier", "YOUR_RANDOM_CHALLENGE");
-
-const response = await axios.post("https://myanimelist.net/v1/oauth2/token", params, {
-  headers: { "Content-Type": "application/x-www-form-urlencoded" },
-});
-
-console.log(response.data);
-```
-
-#### **Response Example:**
-```json
-{
-  "token_type": "Bearer",
-  "expires_in": 2415600,
-  "access_token": "your_access_token",
-  "refresh_token": "your_refresh_token"
-}
-```
- **Copy the `access_token` and `refresh_token`** and store them in your `.env` file.
-
-### **5️⃣ Refreshing the `ACCESS_TOKEN` When It Expires** (Already Implemented in Script)
-Run this cURL command:
-```sh
-curl -X POST https://myanimelist.net/v1/oauth2/token \
-     -d "client_id=YOUR_CLIENT_ID" \
-     -d "grant_type=refresh_token" \
-     -d "refresh_token=YOUR_REFRESH_TOKEN"
-```
-
-Or using **TypeScript (Axios)**:
-```typescript
-const params = new URLSearchParams();
-params.append("client_id", "YOUR_CLIENT_ID");
-params.append("grant_type", "refresh_token");
-params.append("refresh_token", "YOUR_REFRESH_TOKEN");
-
-const response = await axios.post("https://myanimelist.net/v1/oauth2/token", params, {
-  headers: { "Content-Type": "application/x-www-form-urlencoded" },
-});
-
-console.log(response.data);
-```
-
- **This gives you a new `ACCESS_TOKEN` while keeping the same `REFRESH_TOKEN`.**
+- Synced to MAL
+- Pending
+- Error
 
 ---
 
-## Contributing
-We welcome contributions from the community! If you'd like to improve **mal-to-notion**, please:
-1. **Fork the repository**
-2. **Create a feature branch** (`git checkout -b feature-name`)
-3. **Commit your changes** (`git commit -m "Add new feature"`)
-4. **Push to your fork** (`git push origin feature-name`)
-5. **Submit a pull request (PR)**
+## Deploying to Vercel
 
-🚨 **Before contributing, please make sure your code follows the project's coding guidelines.** Repository rules will be set up soon.
+### Option A: Via GitHub (Recommended)
+
+1. Push to GitHub:
+
+```bash
+git remote add origin https://github.com/your-username/notion-to-mal-webhook.git
+git branch -M main
+git push -u origin main
+```
+
+2. Connect to Vercel:
+   - Go to Vercel.com
+   - Sign in with GitHub
+   - Click Add New Project
+   - Select your notion-to-mal-webhook repository
+   - Click Import
+
+3. Set Environment Variables:
+   - In Vercel dashboard, go to Settings → Environment Variables
+   - Add all variables from your .env file
+
+4. Deploy:
+   - Vercel auto-deploys when you push to main
+   - Your webhook URL will be: https://your-vercel-url.vercel.app/api/sync-mal
+
+---
+
+## Setting Up Notion Automation
+
+Once your webhook is deployed to Vercel, create a Notion automation to trigger it:
+
+1. Open your Notion anime database
+2. Click the automation button (lightning icon, top right)
+3. Create a new automation:
+   - Trigger: "Database - Property of page changes"
+   - Property: Select "Status" or "Episodes Watched"
+   - Then: "Send webhook"
+   - URL: Paste your Vercel webhook URL
+   - Method: POST
+   - Headers: Add custom header:
+     - Key: x-webhook-secret
+     - Value: Your WEBHOOK_SECRET from .env
+
+4. Save & activate the automation
+
+---
+
+## How It Works
+
+Flow Diagram:
+
+Notion Page Changed
+↓
+Notion Automation
+↓
+Vercel Webhook (api/sync-mal.ts)
+↓
+Extract: Title, Status, Episodes
+↓
+Search MAL (if no URL)
+↓
+Update/Add to MAL List
+↓
+Update Notion: Sync Status + Timestamp
+
+What Happens on Each Sync:
+
+1. Receive — Webhook gets Notion page data
+2. Extract — Pulls title, status, and episodes watched
+3. Search — Finds anime ID on MAL
+4. Validate — Checks status is valid
+5. Update — Sends update to MAL API
+6. Report — Updates Notion with sync status & timestamp
+7. Error Handling — Stores error message in Notion if anything fails
+
+---
+
+## Troubleshooting
+
+Anime not found on MyAnimeList
+
+- Make sure the anime title matches MAL exactly
+- Try adding the MAL URL to the URL property
+- The search is case-sensitive
+
+Invalid status
+
+- Verify Status property has exact values:
+  - Plan to Watch
+  - Watching
+  - Completed
+  - On Hold
+  - Dropped
+
+Token refresh failed
+
+- Check MAL_CLIENT_ID and MAL_REFRESH_TOKEN in Vercel environment
+- Run npm run oauth locally to get a fresh token
+
+Notion page update failed
+
+- Verify NOTION_API_KEY and NOTION_DATABASE_ID
+- Make sure the Notion integration has access to your database
+
+---
+
+## MAL Status Mapping
+
+Notion Status → MAL Status:
+
+- Plan to Watch → plan_to_watch
+- Watching → watching
+- Completed → completed
+- On Hold → on_hold
+- Dropped → dropped
+
+---
+
+## Development
+
+Useful Commands:
+
+```bash
+npm install          # Install dependencies
+npm run build        # Run TypeScript compiler
+npm run oauth        # One-time OAuth setup
+npm run test         # Test webhook locally
+npm run dev          # Start dev server
+```
+
+Debugging:
+
+- Local testing: Use npm run test to simulate webhook calls
+- Vercel logs: Check vercel logs command or Vercel dashboard
+- Notion: Check Sync Status and Sync Error Message fields on each page
 
 ---
 
 ## License
-This project is licensed under the **MIT License**.
+
+MIT License — see LICENSE file for details
 
 ---
 
 ## Acknowledgments
-- **[MyAnimeList API](https://myanimelist.net/apiconfig/references/api/v2)**
-- **[Notion API](https://developers.notion.com/reference/intro)**
-- Built by [lozo6](https://github.com/lozo6)
+
+- MyAnimeList API (https://myanimelist.net/apiconfig/references/api/v2)
+- Notion API (https://developers.notion.com/)
+- Vercel (https://vercel.com)
+- Built by lozo6
 
 ---
 
-## Contact
-For support, questions, or feature requests:
-- Open an issue [here](https://github.com/lozo6/mal-to-notion/issues)
-- Reach out via GitHub Discussions
+## Support
+
+For help:
+
+- Check the troubleshooting section above
+- Open an issue on GitHub
+- Check Notion/MAL API documentation
+
+Happy anime tracking!

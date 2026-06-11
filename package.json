@@ -1,34 +1,36 @@
 {
-  "name": "mal-to-notion",
+  "name": "notion-to-mal-webhook",
   "version": "1.0.0",
-  "description": "MyAnimeList Notion Automation",
-  "main": "index.js",
+  "description": "Sync your anime list from Notion to MyAnimeList via webhook",
+  "main": "api/sync-mal.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "oauth": "ts-node scripts/oauth-setup.ts",
+    "test": "ts-node scripts/test-webhook.ts",
+    "dev": "ts-node-dev --respawn api/sync-mal.ts"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/lozo6/mal-to-notion.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/lozo6/mal-to-notion/issues"
-  },
-  "homepage": "https://github.com/lozo6/mal-to-notion#readme",
+  "keywords": [
+    "notion",
+    "myanimelist",
+    "mal",
+    "webhook",
+    "typescript"
+  ],
+  "author": "lozo6",
+  "license": "MIT",
   "dependencies": {
     "@notionhq/client": "^2.2.15",
-    "axios": "^1.7.9",
-    "dotenv": "^16.4.7"
+    "@vercel/node": "^3.0.1",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1"
   },
   "devDependencies": {
-    "@types/node": "^22.13.4",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.7.3"
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.3"
   },
   "engines": {
     "node": "18.x"
-  },
-  "engineStrict": true
+  }
 }
