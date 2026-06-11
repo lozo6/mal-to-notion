@@ -46,7 +46,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     console.log("[INFO] Starting scheduled MAL to Notion full sync...\n");
 
     // Refresh token first
-    await malApi.refreshMALToken();
+    accessToken = await malApi.refreshMALToken();
 
     // Fetch entire MAL list
     console.log("[INFO] Fetching your entire MAL anime list...\n");
@@ -83,7 +83,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
         }
 
         // Rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         console.error(
@@ -122,7 +122,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
 async function fetchEntireMALList(): Promise<MALAnime[]> {
   const allAnimes: MALAnime[] = [];
   let offset = 0;
-  const limit = 100;
+  const limit = 200;
   let hasMore = true;
 
   while (hasMore) {
