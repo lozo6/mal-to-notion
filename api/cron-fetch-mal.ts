@@ -2,6 +2,7 @@ import { VercelRequest, VercelResponse } from "@vercel/node";
 import dotenv from "dotenv";
 import axios from "axios";
 import { Client } from "@notionhq/client";
+import * as malApi from "../src/mal-api";
 
 dotenv.config();
 
@@ -45,7 +46,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     console.log("[INFO] Starting scheduled MAL to Notion full sync...\n");
 
     // Refresh token first
-    await refreshToken();
+    await malApi.refreshMALToken();
 
     // Fetch entire MAL list
     console.log("[INFO] Fetching your entire MAL anime list...\n");
@@ -116,34 +117,6 @@ export default async (req: VercelRequest, res: VercelResponse) => {
 };
 
 /**
- * Refresh MAL access token
- */
-async function refreshToken(): Promise<void> {
-  try {
-    const params = new URLSearchParams();
-    params.append("client_id", process.env.MAL_CLIENT_ID!);
-    params.append("grant_type", "refresh_token");
-    params.append("refresh_token", process.env.MAL_REFRESH_TOKEN!);
-
-    if (process.env.MAL_CLIENT_SECRET) {
-      params.append("client_secret", process.env.MAL_CLIENT_SECRET);
-    }
-
-    const response = await axios.post(
-      "https://myanimelist.net/v1/oauth2/token",
-      params,
-      { headers: { "Content-Type": "application/x-www-form-urlencoded" } },
-    );
-
-    accessToken = response.data.access_token;
-    console.log("[SUCCESS] MAL token refreshed");
-  } catch (error) {
-    console.error("[ERROR] Failed to refresh token:", error);
-    throw new Error("Token refresh failed");
-  }
-}
-
-/**
  * Fetch entire MAL anime list with pagination
  */
 async function fetchEntireMALList(): Promise<MALAnime[]> {
@@ -157,14 +130,19 @@ async function fetchEntireMALList(): Promise<MALAnime[]> {
       const response = await axios.get(`${MAL_API_BASE}/users/@me/animelist`, {
         params: {
           fields:
-            "list_status,num_episodes,genres,alternative_titles,main_picture",
+            "list_status,num_episodes,genres,alternative_titles,main_picture,media_type",
           limit,
           offset,
         },
         headers: { Authorization: `Bearer ${accessToken}` },
       });
 
-      allAnimes.push(...response.data.data);
+      // Filter to anime only (exclude manga)
+      const animeOnly = response.data.data.filter(
+        (item: any) => item.node.media_type === "anime",
+      );
+
+      allAnimes.push(...animeOnly);
 
       hasMore = response.data.paging?.next ? true : false;
       offset += limit;
@@ -230,7 +208,7 @@ async function createNotionPage(anime: MALAnime): Promise<void> {
     const sanitizedTitle = sanitizeTitle(title);
     const malUrl = `https://myanimelist.net/anime/${id}/${sanitizedTitle}`;
 
-    const notionGenres = genres.map((g) => ({ name: g.name }));
+    const notionGenres = (genres || []).map((g) => ({ name: g.name }));
 
     // Map MAL status to Notion status
     const notionStatus = anime.list_status
@@ -333,7 +311,7 @@ async function updateNotionPage(anime: MALAnime): Promise<void> {
             number: anime.list_status?.num_watched_episodes || 0,
           },
           Genre: {
-            multi_select: genres.map((g) => ({ name: g.name })),
+            multi_select: (genres || []).map((g) => ({ name: g.name })),
           },
           "Sync Status": {
             select: { name: "Synced to MAL" },
