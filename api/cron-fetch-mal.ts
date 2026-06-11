@@ -225,7 +225,6 @@ async function createNotionPage(anime: MALAnime): Promise<void> {
       alternative_titles,
       num_episodes,
       genres,
-      list_status,
     } = anime.node;
 
     const sanitizedTitle = sanitizeTitle(title);
@@ -234,8 +233,8 @@ async function createNotionPage(anime: MALAnime): Promise<void> {
     const notionGenres = genres.map((g) => ({ name: g.name }));
 
     // Map MAL status to Notion status
-    const notionStatus = list_status
-      ? mapMALStatusToNotion(list_status.status)
+    const notionStatus = anime.list_status
+      ? mapMALStatusToNotion(anime.list_status.status)
       : "Plan to Watch";
 
     console.log(`[INFO] Creating Notion page for "${title}"...`);
@@ -273,7 +272,7 @@ async function createNotionPage(anime: MALAnime): Promise<void> {
           number: num_episodes,
         },
         "Episodes Watched": {
-          number: list_status?.num_watched_episodes || 0,
+          number: anime.list_status?.num_watched_episodes || 0,
         },
         Genre: {
           multi_select: notionGenres,
@@ -299,10 +298,10 @@ async function createNotionPage(anime: MALAnime): Promise<void> {
  */
 async function updateNotionPage(anime: MALAnime): Promise<void> {
   try {
-    const { title, num_episodes, genres, list_status } = anime.node;
+    const { id, title, num_episodes, genres } = anime.node;
 
-    const notionStatus = list_status
-      ? mapMALStatusToNotion(list_status.status)
+    const notionStatus = anime.list_status
+      ? mapMALStatusToNotion(anime.list_status.status)
       : "Plan to Watch";
 
     console.log(`[INFO] Updating Notion page for "${title}"...`);
@@ -313,7 +312,7 @@ async function updateNotionPage(anime: MALAnime): Promise<void> {
       filter: {
         property: "URL",
         url: {
-          contains: `${anime.node.id}`,
+          contains: `${id}`,
         },
       },
     });
@@ -331,7 +330,7 @@ async function updateNotionPage(anime: MALAnime): Promise<void> {
             number: num_episodes,
           },
           "Episodes Watched": {
-            number: list_status?.num_watched_episodes || 0,
+            number: anime.list_status?.num_watched_episodes || 0,
           },
           Genre: {
             multi_select: genres.map((g) => ({ name: g.name })),
