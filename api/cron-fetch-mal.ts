@@ -146,8 +146,8 @@ async function fetchEntireMALList(): Promise<MALAnime[]> {
       }
 
       // Filter to anime only (exclude manga)
-      const animeOnly = response.data.data.filter(
-        (item: any) => item.node.media_type === "anime",
+      const animeOnly = response.data.data.filter((item: any) =>
+        ["tv", "movie", "ova", "special"].includes(item.node.media_type),
       );
 
       console.log(`[DEBUG] Filtered anime count: ${animeOnly.length}`);
