@@ -188,10 +188,6 @@ async function createNotionPage(anime: MALAnime): Promise<void> {
           : [],
       },
       Status: { status: { name: notionStatus } },
-      "Episodes Total": { number: num_episodes },
-      "Episodes Watched": {
-        number: anime.list_status?.num_watched_episodes || 0,
-      },
       Genre: { multi_select: (genres || []).map((g) => ({ name: g.name })) },
       "Sync Status": { select: { name: "Synced to MAL" } },
       "Last Synced": {
@@ -216,10 +212,6 @@ async function updateNotionPage(
     page_id: pageId,
     properties: {
       Status: { status: { name: notionStatus } },
-      "Episodes Total": { number: num_episodes },
-      "Episodes Watched": {
-        number: anime.list_status?.num_watched_episodes || 0,
-      },
       Genre: { multi_select: (genres || []).map((g) => ({ name: g.name })) },
       "Sync Status": { select: { name: "Synced to MAL" } },
       "Last Synced": {
