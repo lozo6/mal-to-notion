@@ -122,6 +122,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
  */
 async function fetchEntireMALList(): Promise<MALAnime[]> {
   const allAnimes: MALAnime[] = [];
+  const mediaTypes = new Set<string>();
   let offset = 0;
   const limit = 200;
   let hasMore = true;
@@ -139,18 +140,27 @@ async function fetchEntireMALList(): Promise<MALAnime[]> {
       });
 
       console.log(`[DEBUG] Raw response count: ${response.data.data.length}`);
+
+      // Track all media types
+      response.data.data.forEach((item: any) => {
+        mediaTypes.add(item.node.media_type);
+      });
+
       if (response.data.data.length > 0) {
         console.log(
-          `[DEBUG] First item: ${JSON.stringify(response.data.data[0].node, null, 2)}`,
+          `[DEBUG] First item media_type: ${response.data.data[0].node.media_type}`,
         );
       }
 
-      // Filter to anime only (exclude manga)
+      // Filter to anime only (tv, ova, movie, special)
       const animeOnly = response.data.data.filter((item: any) =>
-        ["tv", "movie", "ova", "special"].includes(item.node.media_type),
+        ["tv", "ova", "movie", "special"].includes(item.node.media_type),
       );
 
       console.log(`[DEBUG] Filtered anime count: ${animeOnly.length}`);
+      console.log(
+        `[DEBUG] Media types found so far: ${Array.from(mediaTypes).join(", ")}`,
+      );
 
       allAnimes.push(...animeOnly);
 
@@ -164,6 +174,9 @@ async function fetchEntireMALList(): Promise<MALAnime[]> {
     }
   }
 
+  console.log(
+    `[DEBUG] All unique media types in your list: ${Array.from(mediaTypes).join(", ")}`,
+  );
   return allAnimes;
 }
 
@@ -282,7 +295,7 @@ async function createNotionPage(anime: MALAnime): Promise<void> {
 }
 
 /**
- * Update an existing Notion page
+ * Update an existing Notion page (only changed fields)
  */
 async function updateNotionPage(anime: MALAnime): Promise<void> {
   try {
@@ -292,7 +305,10 @@ async function updateNotionPage(anime: MALAnime): Promise<void> {
       ? mapMALStatusToNotion(anime.list_status.status)
       : "Plan to Watch";
 
+    const episodesWatched = anime.list_status?.num_watched_episodes || 0;
+
     console.log(`[INFO] Updating Notion page for "${title}"...`);
+    console.log(`[DEBUG] Episodes watched from MAL: ${episodesWatched}`);
 
     // Find the page by URL to get its ID
     const pages = await notion.databases.query({
@@ -307,32 +323,75 @@ async function updateNotionPage(anime: MALAnime): Promise<void> {
 
     if (pages.results.length > 0) {
       const pageId = pages.results[0].id;
+      const existingPage = pages.results[0] as any;
 
-      await notion.pages.update({
-        page_id: pageId,
-        properties: {
-          Status: {
-            status: { name: notionStatus },
-          },
-          "Episodes Total": {
-            number: num_episodes,
-          },
-          "Episodes Watched": {
-            number: anime.list_status?.num_watched_episodes || 0,
-          },
-          Genre: {
-            multi_select: (genres || []).map((g) => ({ name: g.name })),
-          },
-          "Sync Status": {
-            select: { name: "Synced to MAL" },
-          },
-          "Last Synced": {
-            date: { start: new Date().toISOString().split("T")[0] },
-          },
-        },
-      });
+      // Build update payload with only changed fields
+      const updatePayload: any = {};
 
-      console.log(`[SUCCESS] Updated page for "${title}"\n`);
+      // Check Status
+      const existingStatus = existingPage.properties.Status?.status?.name;
+      if (existingStatus !== notionStatus) {
+        updatePayload.Status = { status: { name: notionStatus } };
+        console.log(
+          `[DEBUG] Status changed: ${existingStatus} → ${notionStatus}`,
+        );
+      }
+
+      // Check Episodes Total
+      const existingEpisodesTotal =
+        existingPage.properties["Episodes Total"]?.number;
+      if (existingEpisodesTotal !== num_episodes) {
+        updatePayload["Episodes Total"] = { number: num_episodes };
+        console.log(
+          `[DEBUG] Episodes Total changed: ${existingEpisodesTotal} → ${num_episodes}`,
+        );
+      }
+
+      // Check Episodes Watched
+      const existingEpisodesWatched =
+        existingPage.properties["Episodes Watched"]?.number;
+      if (existingEpisodesWatched !== episodesWatched) {
+        updatePayload["Episodes Watched"] = { number: episodesWatched };
+        console.log(
+          `[DEBUG] Episodes Watched changed: ${existingEpisodesWatched} → ${episodesWatched}`,
+        );
+      }
+
+      // Check Genres
+      const existingGenres = existingPage.properties.Genre?.multi_select || [];
+      const existingGenreNames = new Set(
+        existingGenres.map((g: any) => g.name),
+      );
+      const newGenreNames = new Set(genres.map((g) => g.name));
+
+      const genresChanged =
+        existingGenreNames.size !== newGenreNames.size ||
+        [...existingGenreNames].some((g: any) => !newGenreNames.has(g));
+
+      if (genresChanged) {
+        updatePayload.Genre = {
+          multi_select: genres.map((g) => ({ name: g.name })),
+        };
+        console.log(`[DEBUG] Genres changed`);
+      }
+
+      // Always update sync status and last synced
+      updatePayload["Sync Status"] = { select: { name: "Synced to MAL" } };
+      updatePayload["Last Synced"] = {
+        date: { start: new Date().toISOString().split("T")[0] },
+      };
+
+      // Only update if there are changes
+      if (Object.keys(updatePayload).length > 0) {
+        await notion.pages.update({
+          page_id: pageId,
+          properties: updatePayload,
+        });
+
+        console.log(`[SUCCESS] Updated page for "${title}"\n`);
+      } else {
+        console.log(`[INFO] No changes detected for "${title}"\n`);
+      }
     }
   } catch (error) {
     console.error(`[ERROR] Failed to update page:`, error);
