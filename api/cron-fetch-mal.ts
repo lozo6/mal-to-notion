@@ -85,9 +85,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
         }),
       );
 
-      console.log(
-        `[INFO] Processed ${Math.min(i + batchSize, malAnimes.length)}/${malAnimes.length}`,
-      );
+      // console.log(`[INFO] Processed ${Math.min(i + batchSize, malAnimes.length)}/${malAnimes.length}`);
     }
 
     console.log(
@@ -196,7 +194,7 @@ async function createNotionPage(anime: MALAnime): Promise<void> {
     },
   });
 
-  console.log(`[INFO] Created: ${title}`);
+  // console.log(`[INFO] Created: ${title}`);
 }
 
 async function updateNotionPage(
@@ -220,7 +218,7 @@ async function updateNotionPage(
     },
   });
 
-  console.log(`[INFO] Updated: ${anime.node.title}`);
+  // console.log(`[INFO] Updated: ${anime.node.title}`);
 }
 
 function sanitizeTitle(title: string): string {
