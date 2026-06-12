@@ -38,316 +38,199 @@ interface NotionPage {
 
 let accessToken = "";
 
-/**
- * Cron job to fetch entire MAL list and sync to Notion
- * Runs on 1st and 15th of each month
- */
 export default async (req: VercelRequest, res: VercelResponse) => {
   try {
-    console.log("[INFO] Starting scheduled MAL to Notion full sync...\n");
+    console.log("[INFO] Starting MAL to Notion sync...\n");
 
-    // Refresh token first
     accessToken = await malApi.refreshMALToken();
+    console.log("[INFO] Fetching MAL list...\n");
 
-    // Fetch entire MAL list
-    console.log("[INFO] Fetching your entire MAL anime list...\n");
     const malAnimes = await fetchEntireMALList();
+    console.log(`[INFO] Found ${malAnimes.length} anime\n`);
 
-    console.log(`[INFO] Found ${malAnimes.length} anime on your MAL list\n`);
-
-    // Fetch existing Notion pages
-    console.log("[INFO] Fetching existing Notion pages...\n");
+    console.log("[INFO] Fetching Notion pages...\n");
     const existingPages = await fetchAllNotionPages();
-    const existingURLMap = new Map(existingPages.map((p) => [p.url, p.id]));
-
-    console.log(`[INFO] Found ${existingPages.length} existing Notion pages\n`);
+    const urlMap = new Map(existingPages.map((p) => [p.url, p.id]));
+    console.log(`[INFO] Found ${existingPages.length} pages\n`);
 
     let created = 0;
     let updated = 0;
     let failed = 0;
 
-    // Process each anime
-    for (const anime of malAnimes) {
-      try {
-        const malUrl = `https://myanimelist.net/anime/${anime.node.id}/${sanitizeTitle(
-          anime.node.title,
-        )}`;
+    // Process in smaller batches
+    const batchSize = 10;
+    for (let i = 0; i < malAnimes.length; i += batchSize) {
+      const batch = malAnimes.slice(i, i + batchSize);
 
-        const existingPageId = existingURLMap.get(malUrl);
-        if (existingPageId) {
-          // Update existing page
-          await updateNotionPage(anime, existingPageId);
-          updated++;
-        } else {
-          // Create new page
-          await createNotionPage(anime);
-          created++;
-        }
+      await Promise.all(
+        batch.map(async (anime) => {
+          try {
+            const malUrl = `https://myanimelist.net/anime/${anime.node.id}/${sanitizeTitle(
+              anime.node.title,
+            )}`;
 
-        // Rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        console.error(
-          `[ERROR] Failed to sync anime ${anime.node.title}: ${errorMsg}`,
-        );
-        failed++;
-      }
+            const pageId = urlMap.get(malUrl);
+            if (pageId) {
+              await updateNotionPage(anime, pageId);
+              updated++;
+            } else {
+              await createNotionPage(anime);
+              created++;
+            }
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error);
+            console.error(`[ERROR] ${anime.node.title}: ${msg}`);
+            failed++;
+          }
+        }),
+      );
+
+      console.log(
+        `[INFO] Processed ${Math.min(i + batchSize, malAnimes.length)}/${malAnimes.length}`,
+      );
     }
 
-    console.log(`\n[SUCCESS] Sync complete!`);
     console.log(
-      `[INFO] Created: ${created}, Updated: ${updated}, Failed: ${failed}\n`,
+      `\n[SUCCESS] Created: ${created}, Updated: ${updated}, Failed: ${failed}\n`,
     );
 
     return res.status(200).json({
       success: true,
-      message: "Scheduled MAL to Notion sync completed",
       created,
       updated,
       failed,
       total: malAnimes.length,
     });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[ERROR] Cron job failed: ${errorMessage}\n`);
-    return res.status(500).json({
-      success: false,
-      error: errorMessage,
-    });
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`[ERROR] ${msg}\n`);
+    return res.status(500).json({ success: false, error: msg });
   }
 };
 
-/**
- * Fetch entire MAL anime list with pagination
- */
 async function fetchEntireMALList(): Promise<MALAnime[]> {
   const allAnimes: MALAnime[] = [];
-  const mediaTypes = new Set<string>();
   let offset = 0;
-  const limit = 200;
+  const limit = 100;
   let hasMore = true;
 
   while (hasMore) {
-    try {
-      const response = await axios.get(`${MAL_API_BASE}/users/@me/animelist`, {
-        params: {
-          fields:
-            "list_status,num_episodes,genres,alternative_titles,main_picture,media_type",
-          limit,
-          offset,
-        },
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+    const response = await axios.get(`${MAL_API_BASE}/users/@me/animelist`, {
+      params: {
+        fields:
+          "list_status,num_episodes,genres,alternative_titles,main_picture,media_type",
+        limit,
+        offset,
+      },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
 
-      console.log(`[DEBUG] Raw response count: ${response.data.data.length}`);
+    const animeOnly = response.data.data.filter((item: any) =>
+      ["tv", "ova", "movie", "special"].includes(item.node.media_type),
+    );
 
-      // Track all media types
-      response.data.data.forEach((item: any) => {
-        mediaTypes.add(item.node.media_type);
-      });
-
-      if (response.data.data.length > 0) {
-        console.log(
-          `[DEBUG] First item media_type: ${response.data.data[0].node.media_type}`,
-        );
-      }
-
-      // Filter to anime only (tv, ova, movie, special)
-      const animeOnly = response.data.data.filter((item: any) =>
-        ["tv", "ova", "movie", "special"].includes(item.node.media_type),
-      );
-
-      console.log(`[DEBUG] Filtered anime count: ${animeOnly.length}`);
-      console.log(
-        `[DEBUG] Media types found so far: ${Array.from(mediaTypes).join(", ")}`,
-      );
-
-      allAnimes.push(...animeOnly);
-
-      hasMore = response.data.paging?.next ? true : false;
-      offset += limit;
-
-      console.log(`[INFO] Fetched ${allAnimes.length} anime so far...`);
-    } catch (error) {
-      console.error("[ERROR] Error fetching MAL list:", error);
-      throw error;
-    }
+    allAnimes.push(...animeOnly);
+    hasMore = response.data.paging?.next ? true : false;
+    offset += limit;
   }
 
-  console.log(
-    `[DEBUG] All unique media types in your list: ${Array.from(mediaTypes).join(", ")}`,
-  );
   return allAnimes;
 }
 
-/**
- * Fetch all existing Notion pages
- */
 async function fetchAllNotionPages(): Promise<NotionPage[]> {
   const allPages: NotionPage[] = [];
-  let hasMore = true;
-  let startCursor: string | undefined = undefined;
+  let cursor: string | undefined = undefined;
 
-  while (hasMore) {
-    try {
-      const response = await notion.databases.query({
-        database_id: databaseId,
-        start_cursor: startCursor,
-        page_size: 100,
-      });
+  while (true) {
+    const response = await notion.databases.query({
+      database_id: databaseId,
+      start_cursor: cursor,
+      page_size: 100,
+    });
 
-      allPages.push(
-        ...response.results.map((page: any) => ({
-          id: page.id,
-          url: page.properties.URL?.url || "",
-        })),
-      );
+    allPages.push(
+      ...response.results.map((page: any) => ({
+        id: page.id,
+        url: page.properties.URL?.url || "",
+      })),
+    );
 
-      hasMore = response.has_more;
-      startCursor = response.next_cursor || undefined;
-    } catch (error) {
-      console.error("[ERROR] Error fetching Notion pages:", error);
-      throw error;
-    }
+    if (!response.has_more) break;
+    cursor = response.next_cursor || undefined;
   }
 
   return allPages;
 }
 
-/**
- * Create a new Notion page for an anime
- */
 async function createNotionPage(anime: MALAnime): Promise<void> {
-  try {
-    const {
-      id,
-      title,
-      main_picture,
-      alternative_titles,
-      num_episodes,
-      genres,
-    } = anime.node;
+  const { id, title, main_picture, alternative_titles, num_episodes, genres } =
+    anime.node;
+  const notionStatus = anime.list_status
+    ? mapMALStatusToNotion(anime.list_status.status)
+    : "Plan to Watch";
 
-    const sanitizedTitle = sanitizeTitle(title);
-    const malUrl = `https://myanimelist.net/anime/${id}/${sanitizedTitle}`;
-
-    const notionGenres = (genres || []).map((g) => ({ name: g.name }));
-
-    // Map MAL status to Notion status
-    const notionStatus = anime.list_status
-      ? mapMALStatusToNotion(anime.list_status.status)
-      : "Plan to Watch";
-
-    console.log(`[INFO] Creating Notion page for "${title}"...`);
-
-    const page = await notion.pages.create({
-      parent: { database_id: databaseId },
-      cover: main_picture.large
-        ? {
-            type: "external",
-            external: { url: main_picture.large },
-          }
-        : undefined,
-      icon: main_picture.medium
-        ? {
-            type: "external",
-            external: { url: main_picture.medium },
-          }
-        : undefined,
-      properties: {
-        Name: {
-          title: [{ text: { content: title } }],
-        },
-        URL: {
-          url: malUrl,
-        },
-        "Alternative Name": {
-          rich_text: alternative_titles?.en
-            ? [{ text: { content: alternative_titles.en } }]
-            : [],
-        },
-        Status: {
-          status: { name: notionStatus },
-        },
-        "Episodes Total": {
-          number: num_episodes,
-        },
-        "Episodes Watched": {
-          number: anime.list_status?.num_watched_episodes || 0,
-        },
-        Genre: {
-          multi_select: notionGenres,
-        },
-        "Sync Status": {
-          select: { name: "Synced to MAL" },
-        },
-        "Last Synced": {
-          date: { start: new Date().toISOString().split("T")[0] },
-        },
+  await notion.pages.create({
+    parent: { database_id: databaseId },
+    cover: main_picture.large
+      ? { type: "external", external: { url: main_picture.large } }
+      : undefined,
+    icon: main_picture.medium
+      ? { type: "external", external: { url: main_picture.medium } }
+      : undefined,
+    properties: {
+      Name: { title: [{ text: { content: title } }] },
+      URL: {
+        url: `https://myanimelist.net/anime/${id}/${sanitizeTitle(title)}`,
       },
-    });
+      "Alternative Name": {
+        rich_text: alternative_titles?.en
+          ? [{ text: { content: alternative_titles.en } }]
+          : [],
+      },
+      Status: { status: { name: notionStatus } },
+      "Episodes Total": { number: num_episodes },
+      "Episodes Watched": {
+        number: anime.list_status?.num_watched_episodes || 0,
+      },
+      Genre: { multi_select: (genres || []).map((g) => ({ name: g.name })) },
+      "Sync Status": { select: { name: "Synced to MAL" } },
+      "Last Synced": {
+        date: { start: new Date().toISOString().split("T")[0] },
+      },
+    },
+  });
 
-    console.log(`[SUCCESS] Created page for "${title}"\n`);
-  } catch (error) {
-    console.error(`[ERROR] Failed to create page:`, error);
-    throw error;
-  }
+  console.log(`[INFO] Created: ${title}`);
 }
 
-/**
- * Update an existing Notion page (only changed fields)
- */
 async function updateNotionPage(
   anime: MALAnime,
   pageId: string,
 ): Promise<void> {
-  try {
-    const { title, num_episodes, genres } = anime.node;
+  const { num_episodes, genres } = anime.node;
+  const notionStatus = anime.list_status
+    ? mapMALStatusToNotion(anime.list_status.status)
+    : "Plan to Watch";
 
-    const notionStatus = anime.list_status
-      ? mapMALStatusToNotion(anime.list_status.status)
-      : "Plan to Watch";
-
-    const episodesWatched = anime.list_status?.num_watched_episodes || 0;
-
-    console.log(`[INFO] Updating Notion page for "${title}"...`);
-
-    // Update all fields
-    await notion.pages.update({
-      page_id: pageId,
-      properties: {
-        Status: {
-          status: { name: notionStatus },
-        },
-        "Episodes Total": {
-          number: num_episodes,
-        },
-        "Episodes Watched": {
-          number: episodesWatched,
-        },
-        Genre: {
-          multi_select: (genres || []).map((g) => ({ name: g.name })),
-        },
-        "Sync Status": {
-          select: { name: "Synced to MAL" },
-        },
-        "Last Synced": {
-          date: { start: new Date().toISOString().split("T")[0] },
-        },
+  await notion.pages.update({
+    page_id: pageId,
+    properties: {
+      Status: { status: { name: notionStatus } },
+      "Episodes Total": { number: num_episodes },
+      "Episodes Watched": {
+        number: anime.list_status?.num_watched_episodes || 0,
       },
-    });
+      Genre: { multi_select: (genres || []).map((g) => ({ name: g.name })) },
+      "Sync Status": { select: { name: "Synced to MAL" } },
+      "Last Synced": {
+        date: { start: new Date().toISOString().split("T")[0] },
+      },
+    },
+  });
 
-    console.log(`[SUCCESS] Updated page for "${title}"\n`);
-  } catch (error) {
-    console.error(`[ERROR] Failed to update page:`, error);
-    throw error;
-  }
+  console.log(`[INFO] Updated: ${anime.node.title}`);
 }
 
-/**
- * Sanitize anime title for URL
- */
 function sanitizeTitle(title: string): string {
   return title
     .replace(/[^a-zA-Z0-9]/g, "_")
@@ -355,16 +238,13 @@ function sanitizeTitle(title: string): string {
     .toLowerCase();
 }
 
-/**
- * Map MAL status to Notion status
- */
 function mapMALStatusToNotion(malStatus: string): string {
-  const statusMap: Record<string, string> = {
+  const map: Record<string, string> = {
     watching: "Watching",
     completed: "Completed",
     on_hold: "On Hold",
     dropped: "Dropped",
     plan_to_watch: "Plan to Watch",
   };
-  return statusMap[malStatus.toLowerCase()] || "Plan to Watch";
+  return map[malStatus.toLowerCase()] || "Plan to Watch";
 }
