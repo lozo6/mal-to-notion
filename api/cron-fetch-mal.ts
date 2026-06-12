@@ -58,7 +58,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     // Fetch existing Notion pages
     console.log("[INFO] Fetching existing Notion pages...\n");
     const existingPages = await fetchAllNotionPages();
-    const existingURLs = new Set(existingPages.map((p) => p.url));
+    const existingURLMap = new Map(existingPages.map((p) => [p.url, p.id]));
 
     console.log(`[INFO] Found ${existingPages.length} existing Notion pages\n`);
 
@@ -73,9 +73,10 @@ export default async (req: VercelRequest, res: VercelResponse) => {
           anime.node.title,
         )}`;
 
-        if (existingURLs.has(malUrl)) {
+        const existingPageId = existingURLMap.get(malUrl);
+        if (existingPageId) {
           // Update existing page
-          await updateNotionPage(anime);
+          await updateNotionPage(anime, existingPageId);
           updated++;
         } else {
           // Create new page
@@ -297,9 +298,12 @@ async function createNotionPage(anime: MALAnime): Promise<void> {
 /**
  * Update an existing Notion page (only changed fields)
  */
-async function updateNotionPage(anime: MALAnime): Promise<void> {
+async function updateNotionPage(
+  anime: MALAnime,
+  pageId: string,
+): Promise<void> {
   try {
-    const { id, title, num_episodes, genres } = anime.node;
+    const { title, num_episodes, genres } = anime.node;
 
     const notionStatus = anime.list_status
       ? mapMALStatusToNotion(anime.list_status.status)
@@ -308,50 +312,33 @@ async function updateNotionPage(anime: MALAnime): Promise<void> {
     const episodesWatched = anime.list_status?.num_watched_episodes || 0;
 
     console.log(`[INFO] Updating Notion page for "${title}"...`);
-    console.log(`[DEBUG] Episodes watched from MAL: ${episodesWatched}`);
 
-    // Find the page by URL to get its ID
-    const pages = await notion.databases.query({
-      database_id: databaseId,
-      filter: {
-        property: "URL",
-        url: {
-          contains: `${id}`,
+    // Update all fields
+    await notion.pages.update({
+      page_id: pageId,
+      properties: {
+        Status: {
+          status: { name: notionStatus },
+        },
+        "Episodes Total": {
+          number: num_episodes,
+        },
+        "Episodes Watched": {
+          number: episodesWatched,
+        },
+        Genre: {
+          multi_select: (genres || []).map((g) => ({ name: g.name })),
+        },
+        "Sync Status": {
+          select: { name: "Synced to MAL" },
+        },
+        "Last Synced": {
+          date: { start: new Date().toISOString().split("T")[0] },
         },
       },
-      page_size: 1,
     });
 
-    if (pages.results.length > 0) {
-      const pageId = pages.results[0].id;
-
-      // Update all fields (skip change detection for speed)
-      await notion.pages.update({
-        page_id: pageId,
-        properties: {
-          Status: {
-            status: { name: notionStatus },
-          },
-          "Episodes Total": {
-            number: num_episodes,
-          },
-          "Episodes Watched": {
-            number: episodesWatched,
-          },
-          Genre: {
-            multi_select: (genres || []).map((g) => ({ name: g.name })),
-          },
-          "Sync Status": {
-            select: { name: "Synced to MAL" },
-          },
-          "Last Synced": {
-            date: { start: new Date().toISOString().split("T")[0] },
-          },
-        },
-      });
-
-      console.log(`[SUCCESS] Updated page for "${title}"\n`);
-    }
+    console.log(`[SUCCESS] Updated page for "${title}"\n`);
   } catch (error) {
     console.error(`[ERROR] Failed to update page:`, error);
     throw error;
