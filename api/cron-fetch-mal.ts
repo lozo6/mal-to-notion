@@ -23,6 +23,7 @@ interface MALAnime {
     };
     num_episodes: number;
     genres: Array<{ id: number; name: string }>;
+    media_type?: string;
   };
   list_status?: {
     status: string;
@@ -137,10 +138,19 @@ async function fetchEntireMALList(): Promise<MALAnime[]> {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
 
+      console.log(`[DEBUG] Raw response count: ${response.data.data.length}`);
+      if (response.data.data.length > 0) {
+        console.log(
+          `[DEBUG] First item: ${JSON.stringify(response.data.data[0].node, null, 2)}`,
+        );
+      }
+
       // Filter to anime only (exclude manga)
       const animeOnly = response.data.data.filter(
         (item: any) => item.node.media_type === "anime",
       );
+
+      console.log(`[DEBUG] Filtered anime count: ${animeOnly.length}`);
 
       allAnimes.push(...animeOnly);
 
