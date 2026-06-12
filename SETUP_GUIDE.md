@@ -1,143 +1,173 @@
-# Notion to MAL Webhook Setup Guide
+# Quick Setup Guide
 
-## Project Structure
+Get your Notion to MyAnimeList sync running in 5 minutes.
 
-```
-notion-to-mal-webhook/
-├── api/
-│   └── sync-mal.ts                 # Vercel serverless function (webhook endpoint)
-├── scripts/
-│   ├── oauth-setup.ts              # One-time OAuth flow to get tokens
-│   └── test-webhook.ts             # Manual testing script
-├── src/
-│   ├── types.ts                    # TypeScript interfaces
-│   ├── mal-api.ts                  # MAL API functions
-│   └── notion-api.ts               # Notion API utilities
-├── .env.example                    # Example environment variables
-├── .env                            # Your actual secrets (LOCAL ONLY - gitignored)
-├── .gitignore                      # Git ignore file
-├── package.json                    # Dependencies
-├── tsconfig.json                   # TypeScript config
-└── README.md                        # Documentation
-```
+---
 
-## Step 1: Initialize Project
+## Prerequisites
+
+- Node.js 24.x
+- MyAnimeList Account
+- Notion Account
+- Vercel Account (free)
+
+---
+
+## 1. Clone & Install (2 min)
 
 ```bash
-mkdir notion-to-mal-webhook
+git clone https://github.com/lozo6/notion-to-mal-webhook.git
 cd notion-to-mal-webhook
-npm init -y
+npm install
 ```
 
-## Step 2: Install Dependencies
+---
 
-```bash
-npm install typescript ts-node dotenv axios @notionhq/client
-npm install -D @types/node ts-node-dev
-```
+## 2. Get Credentials (3 min)
 
-## Step 3: Create Folder Structure
+### MyAnimeList
 
-```bash
-mkdir -p api scripts src
-```
+1. Go to https://myanimelist.net/apiconfig
+2. Click "Create ID"
+3. Fill in:
+   - App Name: `Notion to MAL Webhook`
+   - App Type: `Web`
+   - Redirect URL: `http://localhost:3000/oauth`
+   - Homepage: Your GitHub/website
+4. Copy **Client ID** and **Client Secret**
 
-## Step 4: Initialize TypeScript
+### Notion
 
-```bash
-npx tsc --init
-```
+1. Go to https://www.notion.so/profile/integrations
+2. Click "Create New Integration"
+3. Copy your **API Key**
+4. Open your anime database, get **Database ID** from URL
+5. Share database with your integration
 
-Then update `tsconfig.json` with:
+---
 
-```json
-{
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "commonjs",
-    "lib": ["ES2020"],
-    "outDir": "./dist",
-    "rootDir": "./",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true
-  },
-  "include": ["scripts/**/*", "src/**/*", "api/**/*"],
-  "exclude": ["node_modules"]
-}
-```
-
-## Step 5: Create .env and .env.example
-
-See the `.env.example` file for structure. Copy it:
+## 3. Create .env File
 
 ```bash
 cp .env.example .env
 ```
 
-## Step 6: Create package.json Scripts
+Fill it in:
 
-Add these to your `package.json`:
-
-```json
-{
-  "scripts": {
-    "build": "tsc",
-    "oauth": "ts-node scripts/oauth-setup.ts",
-    "test": "ts-node scripts/test-webhook.ts",
-    "dev": "ts-node-dev --respawn api/sync-mal.ts"
-  }
-}
-```
-
-## Workflow
-
-1. **Get tokens:** `npm run oauth`
-2. **Test locally:** `npm run test`
-3. **Deploy to Vercel:** Push to GitHub, Vercel auto-deploys
-4. **Set up Notion automation:** Point to your Vercel webhook URL
-
-## Environment Variables (for .env)
-
-```
-# MAL OAuth
+```ini
 MAL_CLIENT_ID=your_client_id
-MAL_CLIENT_SECRET=your_client_secret (optional for web app)
-MAL_REFRESH_TOKEN=your_refresh_token (set after oauth script)
+MAL_CLIENT_SECRET=your_client_secret
+MAL_REFRESH_TOKEN=leave_blank_for_now
 
-# Notion
-NOTION_API_KEY=your_notion_api_key
-NOTION_DATABASE_ID=your_anime_database_id
+NOTION_API_KEY=your_notion_key
+NOTION_DATABASE_ID=your_database_id
 
-# Webhook Security
-WEBHOOK_SECRET=your_random_secret_key
-
-# Local Testing
-LOCAL_PORT=3000
+WEBHOOK_SECRET=any_random_string
 ```
-
-## Next Steps
-
-1. Create all the files from the following sections
-2. Run `npm run oauth` to get your tokens
-3. Run `npm run test` to validate webhook logic
-4. Deploy to Vercel and update your Notion automation
 
 ---
 
-**Files to create next (in order):**
+## 4. Get MAL Token (1 min)
 
-1. `.env.example`
-2. `src/types.ts`
-3. `src/mal-api.ts`
-4. `src/notion-api.ts`
-5. `scripts/oauth-setup.ts`
-6. `scripts/test-webhook.ts`
-7. `api/sync-mal.ts`
-8. `.gitignore`
-9. `README.md`
+```bash
+npm run oauth
+```
+
+1. Click the printed authorization URL
+2. Click "Authorize" on MyAnimeList
+3. Copy the code from redirect URL
+4. Paste code back into terminal
+
+Your `.env` will auto-update with `MAL_REFRESH_TOKEN`.
+
+---
+
+## 5. Test Locally
+
+```bash
+npm run test
+```
+
+Should see:
+
+```
+[INFO] Starting MAL to Notion sync...
+[INFO] Fetching MAL list...
+[INFO] Found 50 anime
+[INFO] Created: 3, Updated: 5, Failed: 0
+```
+
+---
+
+## 6. Deploy to Vercel
+
+### Via GitHub
+
+```bash
+git remote add origin https://github.com/your-username/your-repo.git
+git branch -M main
+git push -u origin main
+```
+
+Then on Vercel:
+
+1. Go to vercel.com
+2. Click "Add New Project"
+3. Select your GitHub repo
+4. Add environment variables (same as `.env`)
+5. Deploy
+
+Your cron URL: `https://your-project.vercel.app/api/cron-fetch-mal`
+
+---
+
+## 7. Create Notion Button
+
+In your Notion database:
+
+1. Click + to add property
+2. Name: "Sync from MAL"
+3. Type: Button
+4. Action: "Send web request"
+5. URL: `https://your-project.vercel.app/api/cron-fetch-mal`
+6. Method: POST
+7. Header:
+   - Key: `x-webhook-secret`
+   - Value: Your `WEBHOOK_SECRET`
+
+---
+
+## 8. Done!
+
+Your sync is now:
+
+- Running automatically on 1st and 15th of each month
+- Triggerable anytime via Notion button
+- Pulling anime from MAL with cover art
+- Updating your Notion database
+
+---
+
+## Troubleshooting
+
+**Button doesn't work?**
+
+- Check Vercel env variables match `.env`
+- Verify webhook secret is correct
+- Check Vercel logs
+
+**Anime not syncing?**
+
+- Make sure anime is on your MAL list
+- Verify Notion database ID is correct
+- Run `npm run test` locally to debug
+
+**Need help?**
+
+- Check full README.md
+- See MAL/Notion API docs
+- Open GitHub issue
+
+---
+
+Happy tracking!

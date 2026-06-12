@@ -1,20 +1,36 @@
-# Notion to MyAnimeList Webhook
+# Notion ↔ MyAnimeList Sync
 
-notion-to-mal-webhook is a TypeScript-powered serverless webhook that syncs your anime list from Notion to MyAnimeList (MAL) in real-time. Change a status or episode count in Notion, and it automatically updates on MAL.
+A serverless cron job that automatically syncs your MyAnimeList to Notion. Your anime library is always up to date with the latest status, genres, and cover art.
 
 ---
 
 ## Features
 
-- Real-time sync — Changes in Notion instantly update MAL
-- Status updates — Plan to Watch, Watching, Completed, On Hold, Dropped
-- Episode tracking — Sync episodes watched to MAL
-- Error handling — Detailed error messages stored in Notion
-- Token refresh — Automatic MAL OAuth token refresh
-- Search fallback — If MAL URL is missing, searches by anime title
-- TypeScript — Fully typed for safety
-- Vercel deployment — One-click serverless deployment
-- Local testing — Test your webhook before deploying
+- **Automated Sync** — Runs automatically on the 1st and 15th of each month
+- **Manual Trigger** — Click a button in Notion to sync anytime
+- **Full List Fetch** — Pulls your entire MAL library
+- **Smart Sync** — Creates new pages for anime not in Notion, updates existing ones
+- **Cover Art** — Fetches poster images and icons from MAL
+- **Status Tracking** — Syncs your watch status (Watching, Completed, On Hold, etc.)
+- **Genre Tags** — Auto-populates genres from MAL
+- **Error Handling** — Tracks sync status and timestamps
+- **TypeScript** — Fully typed for safety
+- **Vercel Deployment** — One-click serverless deployment
+- **Zero Config** — Just set environment variables and go
+
+---
+
+## What It Does
+
+When you run the sync:
+
+1. Fetches your entire MAL anime list
+2. Filters to anime only (excludes manga)
+3. For each anime:
+   - **If it's new on MAL:** Creates a new Notion page with cover art, icons, genres, status
+   - **If it already exists:** Updates status, genres, and metadata
+4. Updates Notion "Last Synced" timestamp
+5. Logs results: created, updated, failed
 
 ---
 
@@ -23,20 +39,17 @@ notion-to-mal-webhook is a TypeScript-powered serverless webhook that syncs your
 ```
 notion-to-mal-webhook/
 ├── api/
-│   ├── sync-mal.ts                 # Vercel serverless webhook function (Notion → MAL)
-│   └── sync-from-mal.ts            # Vercel webhook for MAL → Notion sync
-├── scripts/
-│   ├── oauth-setup.ts              # One-time OAuth setup
-│   └── test-webhook.ts             # Local webhook testing
+│   └── cron-fetch-mal.ts           # Vercel cron job (runs 1st & 15th)
 ├── src/
-│   ├── types.ts                    # TypeScript types & interfaces
+│   ├── types.ts                    # TypeScript interfaces
 │   ├── mal-api.ts                  # MAL API functions
 │   └── notion-api.ts               # Notion API utilities
 ├── .env.example                    # Example environment variables
-├── .env                            # Your secrets (local only, gitignored)
-├── .gitignore                      # Git ignore rules
+├── .env                            # Your secrets (LOCAL ONLY - gitignored)
+├── .gitignore                      # Git ignore file
 ├── package.json                    # Dependencies & scripts
 ├── tsconfig.json                   # TypeScript configuration
+├── vercel.json                     # Vercel cron configuration
 └── README.md                        # This file
 ```
 
@@ -44,11 +57,11 @@ notion-to-mal-webhook/
 
 ## Prerequisites
 
-- Node.js 18+ (verify with `node --version`)
+- Node.js 24.x (verify with `node --version`)
 - npm (comes with Node)
-- MyAnimeList Account — You'll need to register an API application
-- Notion Account — With access to your anime database
-- Vercel Account (optional, for deployment) — Free tier works fine
+- MyAnimeList Account — With anime list
+- Notion Account — With anime database
+- Vercel Account (free tier works) — For deployment
 
 ---
 
@@ -89,21 +102,28 @@ NODE_ENV=development
 ### Step 3: Get MAL Client ID
 
 1. Go to MyAnimeList API Applications (https://myanimelist.net/apiconfig)
-2. Click Create ID and fill in the form:
+2. Click "Create ID" and fill in the form:
    - App Name: "Notion to MAL Webhook"
    - App Type: "Web"
-   - Redirect URL: http://localhost/oauth
+   - Redirect URL: `http://localhost:3000/oauth`
    - Homepage URL: Your GitHub repo or personal website
-3. Copy your Client ID (and optionally Client Secret) to .env
+3. Copy your **Client ID** to .env as `MAL_CLIENT_ID`
+4. Copy your **Client Secret** to .env as `MAL_CLIENT_SECRET`
 
 ### Step 4: Get Notion API Key & Database ID
 
 1. Go to Notion Developer Console (https://www.notion.so/profile/integrations)
-2. Click Create New Integration and follow the prompts
-3. Copy your API Key to .env as NOTION_API_KEY
-4. Open your anime database in Notion, copy the database ID from the URL:
-   - URL: https://www.notion.so/{workspace}/{DATABASE_ID}?v=...
-   - Copy everything between the slash and the question mark
+2. Click "Create New Integration" and follow the prompts
+3. Copy your **API Key** to .env as `NOTION_API_KEY`
+4. Open your anime database in Notion
+5. Copy the **Database ID** from the URL:
+   - URL: `https://www.notion.so/{workspace}/{DATABASE_ID}?v=...`
+   - Copy everything between `/` and `?`
+   - Paste as `NOTION_DATABASE_ID`
+6. Share your database with the integration:
+   - Click the three dots in your Notion database
+   - Click "Add Connections"
+   - Select your integration
 
 ### Step 5: Run OAuth Setup (One-time)
 
@@ -115,26 +135,25 @@ npm run oauth
 
 Follow the prompts:
 
-1. Click the generated authorization URL
-2. Authorize the application on MyAnimeList
-3. Copy the authorization code from the redirect URL
-4. Paste it back into the terminal
-
-Your .env file will be automatically updated with the refresh token.
+1. A URL will be printed — copy and open it in your browser
+2. Click "Authorize" on MyAnimeList
+3. You'll be redirected to a page with an authorization code
+4. Copy the code and paste it back into the terminal
+5. Your .env file will be automatically updated with `MAL_REFRESH_TOKEN`
 
 ### Step 6: Test Locally
 
-Before deploying, test the webhook locally:
+Before deploying, test the cron locally:
 
 ```bash
 npm run test
 ```
 
-This runs three test scenarios:
+This simulates a sync run. Check for:
 
-1. Basic Status Update
-2. Status + Episodes
-3. Mark Completed
+- ✅ "Starting MAL to Notion sync..."
+- ✅ "Found X anime"
+- ✅ "Created: X, Updated: Y, Failed: Z"
 
 ---
 
@@ -142,17 +161,17 @@ This runs three test scenarios:
 
 Your anime database needs these properties:
 
-Name (Title) - Required - Anime title
-URL (URL) - Optional - MAL anime link
-Status (Status) - Required - Plan to Watch / Watching / Completed / On Hold / Dropped
-Episodes Watched (Number) - Optional
-Episodes Total (Number) - Optional
-Genre (Multi-select) - Optional
-Sync Status (Select) - Internal
-Last Synced (Date) - Internal
-Sync Error Message (Rich Text) - Internal
+| Property         | Type         | Required | Notes                                               |
+| ---------------- | ------------ | -------- | --------------------------------------------------- |
+| Name             | Title        | ✅ Yes   | Anime title                                         |
+| URL              | URL          | ✅ Yes   | MAL anime link (added by cron)                      |
+| Alternative Name | Rich Text    | ❌ No    | English title if different                          |
+| Status           | Status       | ✅ Yes   | Current watch status                                |
+| Genre            | Multi-select | ❌ No    | Auto-populated from MAL                             |
+| Sync Status      | Select       | ❌ No    | Internal tracking (Synced to MAL / Pending / Error) |
+| Last Synced      | Date         | ❌ No    | When the page was last updated                      |
 
-Status options:
+**Status Options** (exact names matter):
 
 - Plan to Watch
 - Watching
@@ -160,11 +179,33 @@ Status options:
 - On Hold
 - Dropped
 
-Sync Status options:
+**Sync Status Options:**
 
 - Synced to MAL
 - Pending
 - Error
+
+---
+
+## How to Use
+
+### Manual Sync (Anytime)
+
+When you add a new anime to your MAL list:
+
+1. Go to your Notion anime database
+2. Click the "Sync from MAL" button (or automation button)
+3. The cron job runs immediately
+4. New anime appears in Notion within seconds
+
+### Automatic Sync (Scheduled)
+
+The cron runs automatically:
+
+- **1st of the month** at 00:00 UTC
+- **15th of the month** at 00:00 UTC
+
+All your anime is synced without any action needed.
 
 ---
 
@@ -181,110 +222,113 @@ git push -u origin main
 ```
 
 2. Connect to Vercel:
-   - Go to Vercel.com
+   - Go to [Vercel.com](https://vercel.com)
    - Sign in with GitHub
-   - Click Add New Project
-   - Select your notion-to-mal-webhook repository
-   - Click Import
+   - Click "Add New Project"
+   - Select `notion-to-mal-webhook` repository
+   - Click "Import"
 
 3. Set Environment Variables:
-   - In Vercel dashboard, go to Settings → Environment Variables
-   - Add all variables from your .env file
+   - In Vercel dashboard, go to **Settings → Environment Variables**
+   - Add all variables from your `.env` file:
+     - `MAL_CLIENT_ID`
+     - `MAL_CLIENT_SECRET`
+     - `MAL_REFRESH_TOKEN`
+     - `NOTION_API_KEY`
+     - `NOTION_DATABASE_ID`
+     - `WEBHOOK_SECRET`
+   - Click "Save"
 
 4. Deploy:
-   - Vercel auto-deploys when you push to main
-   - Your webhook URL will be: https://your-vercel-url.vercel.app/api/sync-mal
+   - Vercel auto-deploys when you push to `main`
+   - Your cron will be available at: `https://your-project-name.vercel.app/api/cron-fetch-mal`
 
 ---
 
-## Setting Up Notion Automation
+## Setting Up the Automation Button in Notion
 
-Once your webhook is deployed to Vercel, create a Notion automation to trigger it:
+Once deployed, create a button in Notion that triggers manual sync:
 
 1. Open your Notion anime database
-2. Click the automation button (lightning icon, top right)
-3. Create a new automation:
-   - Trigger: "Database - Property of page changes"
-   - Property: Select "Status" or "Episodes Watched"
-   - Then: "Send webhook"
-   - URL: Paste your Vercel webhook URL
-   - Method: POST
-   - Headers: Add custom header:
-     - Key: x-webhook-secret
-     - Value: Your WEBHOOK_SECRET from .env
+2. Click the **+** icon to add a new property
+3. Configure:
+   - **Name:** "Sync from MAL" (or whatever you like)
+   - **Type:** Button
+   - **Button Text:** "Sync from MAL"
+   - **Action:** "Send web request"
+   - **URL:** `https://your-project-name.vercel.app/api/cron-fetch-mal`
+   - **Method:** POST
+   - **Headers:** Add custom header:
+     - **Key:** `x-webhook-secret`
+     - **Value:** Your `WEBHOOK_SECRET` from `.env`
 
-4. Save & activate the automation
+4. Save
 
----
-
-## How It Works
-
-Flow Diagram:
-
-Notion Page Changed
-↓
-Notion Automation
-↓
-Vercel Webhook (api/sync-mal.ts)
-↓
-Extract: Title, Status, Episodes
-↓
-Search MAL (if no URL)
-↓
-Update/Add to MAL List
-↓
-Update Notion: Sync Status + Timestamp
-
-What Happens on Each Sync:
-
-1. Receive — Webhook gets Notion page data
-2. Extract — Pulls title, status, and episodes watched
-3. Search — Finds anime ID on MAL
-4. Validate — Checks status is valid
-5. Update — Sends update to MAL API
-6. Report — Updates Notion with sync status & timestamp
-7. Error Handling — Stores error message in Notion if anything fails
-
----
-
-## Troubleshooting
-
-Anime not found on MyAnimeList
-
-- Make sure the anime title matches MAL exactly
-- Try adding the MAL URL to the URL property
-- The search is case-sensitive
-
-Invalid status
-
-- Verify Status property has exact values:
-  - Plan to Watch
-  - Watching
-  - Completed
-  - On Hold
-  - Dropped
-
-Token refresh failed
-
-- Check MAL_CLIENT_ID and MAL_REFRESH_TOKEN in Vercel environment
-- Run npm run oauth locally to get a fresh token
-
-Notion page update failed
-
-- Verify NOTION_API_KEY and NOTION_DATABASE_ID
-- Make sure the Notion integration has access to your database
+Now you can click the button anytime to trigger an immediate sync!
 
 ---
 
 ## MAL Status Mapping
 
-Notion Status → MAL Status:
+The cron converts MAL statuses to Notion statuses:
 
-- Plan to Watch → plan_to_watch
-- Watching → watching
-- Completed → completed
-- On Hold → on_hold
-- Dropped → dropped
+| MAL Status    | Notion Status |
+| ------------- | ------------- |
+| watching      | Watching      |
+| completed     | Completed     |
+| on_hold       | On Hold       |
+| dropped       | Dropped       |
+| plan_to_watch | Plan to Watch |
+
+---
+
+## Troubleshooting
+
+### Cron not running
+
+- Check Vercel dashboard: Settings → Cron Jobs
+- Verify `vercel.json` has correct cron schedule:
+  ```json
+  {
+    "crons": [
+      {
+        "path": "/api/cron-fetch-mal",
+        "schedule": "0 0 1,15 * *"
+      }
+    ]
+  }
+  ```
+
+### Anime not syncing to Notion
+
+- Make sure anime is on your MAL list
+- Check "Last Synced" date on Notion page
+- Verify `NOTION_DATABASE_ID` is correct in Vercel env
+- Check Vercel logs: `vercel logs`
+
+### Status not updating
+
+- Verify status names match exactly (see table above)
+- Make sure Status property is set to "Status" type in Notion
+- Check anime is on your MAL list
+
+### Token refresh failed
+
+- Run `npm run oauth` locally to get a fresh token
+- Update `MAL_REFRESH_TOKEN` in Vercel environment variables
+- Verify `MAL_CLIENT_ID` is correct
+
+### Missing cover art
+
+- MAL returns `main_picture.large` and `main_picture.medium`
+- If missing, Notion page will have no cover/icon (this is normal)
+- Older anime may not have cover art on MAL
+
+### Button says "Error"
+
+- Click the Vercel logs to see details
+- Most common: wrong URL or missing environment variables
+- Verify webhook secret matches between Notion and Vercel
 
 ---
 
@@ -294,17 +338,48 @@ Useful Commands:
 
 ```bash
 npm install          # Install dependencies
-npm run build        # Run TypeScript compiler
-npm run oauth        # One-time OAuth setup
-npm run test         # Test webhook locally
-npm run dev          # Start dev server
+npm run build        # Compile TypeScript
+npm run oauth        # One-time OAuth setup (generates tokens)
+npm run test         # Test cron locally (simulate a run)
 ```
 
 Debugging:
 
-- Local testing: Use npm run test to simulate webhook calls
-- Vercel logs: Check vercel logs command or Vercel dashboard
-- Notion: Check Sync Status and Sync Error Message fields on each page
+- **Local:** Use `npm run test` to simulate the cron
+- **Production:** Check Vercel dashboard → Deployments → Runtime Logs
+- **Notion:** Check "Sync Status" and "Last Synced" fields on each page
+
+---
+
+## Architecture
+
+```
+Your MAL List
+     ↓
+Cron Job (1st & 15th)
+     ↓
+Fetch Entire List
+     ↓
+Filter to Anime Only
+     ↓
+For Each Anime:
+  - Build MAL URL
+  - Check if exists in Notion
+  - Create or Update page
+     ↓
+Update Sync Timestamps
+     ↓
+Log Results
+```
+
+---
+
+## Rate Limiting
+
+- MAL API: No strict limits for authenticated requests
+- Notion API: 3-4 requests per second (cron respects this)
+- Batch Size: 10 anime processed in parallel
+- Delay Between Batches: 50ms
 
 ---
 
@@ -314,21 +389,15 @@ MIT License — see LICENSE file for details
 
 ---
 
-## Acknowledgments
-
-- MyAnimeList API (https://myanimelist.net/apiconfig/references/api/v2)
-- Notion API (https://developers.notion.com/)
-- Vercel (https://vercel.com)
-- Built by lozo6
-
----
-
 ## Support
 
 For help:
 
 - Check the troubleshooting section above
 - Open an issue on GitHub
-- Check Notion/MAL API documentation
+- Check [MAL API Docs](https://myanimelist.net/apiconfig/references/api/v2)
+- Check [Notion API Docs](https://developers.notion.com/)
 
-Happy anime tracking!
+---
+
+**Built by lozo6** — Happy anime tracking! 🍿✨
