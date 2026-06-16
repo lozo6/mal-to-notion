@@ -103,7 +103,7 @@ NODE_ENV=development
 
 1. Go to MyAnimeList API Applications (https://myanimelist.net/apiconfig)
 2. Click "Create ID" and fill in the form:
-   - App Name: "Notion to MAL Webhook"
+   - App Name: "MAL to Notion Webhook"
    - App Type: "Web"
    - Redirect URL: `http://localhost:3000/oauth`
    - Homepage URL: Your GitHub repo or personal website
