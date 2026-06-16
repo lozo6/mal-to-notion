@@ -16,8 +16,8 @@ Get your Notion to MyAnimeList sync running in 5 minutes.
 ## 1. Clone & Install (2 min)
 
 ```bash
-git clone https://github.com/lozo6/notion-to-mal-webhook.git
-cd notion-to-mal-webhook
+git clone https://github.com/lozo6/mal-to-notion.git
+cd mal-to-notion
 npm install
 ```
 
